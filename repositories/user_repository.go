@@ -20,6 +20,7 @@ type UserRepository interface {
 	Save(ctx context.Context, user *models.User) (*models.User, error)
 	Delete(ctx context.Context, id primitive.ObjectID) error
 	Update(ctx context.Context, id primitive.ObjectID, update userDto.UpdateUserDTO) (*models.User, error)
+	ExistsByEmail(ctx context.Context, email string) (bool, error)
 }
 
 type userRepository struct {
@@ -108,11 +109,30 @@ func (u *userRepository) Update(ctx context.Context, id primitive.ObjectID, upda
 	err := u.collection.FindOneAndUpdate(ctx, bson.M{"_id": id}, base, opts).Decode(&updatedUser)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, nil
+			return nil, fmt.Errorf("User not found")
 		}
 		return nil, fmt.Errorf("fail to update user: %w", err)
 	}
 
 	return &updatedUser, nil
+}
+
+func (u *userRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
+    filter := bson.M{"email": email}
+    opts := options.FindOne().SetProjection(bson.M{"_id": 1})
+
+    var result struct {
+        ID primitive.ObjectID `bson:"_id"`
+    }
+
+    err := u.collection.FindOne(ctx, filter, opts).Decode(&result)
+    if err != nil {
+        if errors.Is(err, mongo.ErrNoDocuments) {
+            return false, nil
+        }
+        return false, fmt.Errorf("fail to check if user exists by email: %w", err)
+    }
+
+    return true, nil
 }
 
