@@ -15,6 +15,7 @@ func main() {
 
 	config.ConnectDB()
 	db := config.GetDB()
+	// app.Use(middleware.Cors())
 	
 	taskRepository := repository.NewTaskRepository(db)
 	taskService := services.NewTaskService(taskRepository)
