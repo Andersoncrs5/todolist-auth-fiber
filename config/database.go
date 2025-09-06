@@ -14,7 +14,7 @@ import (
 
 var DB *mongo.Client
 
-func ConnectDB()  {
+func ConnectDB() *mongo.Client {
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err);
 	}
@@ -44,6 +44,7 @@ func ConnectDB()  {
 
 	DB = client
 	fmt.Println("Mongodb connected!!")
+	return DB
 }
 
 func GetCollection(collectionName string) *mongo.Collection {
@@ -52,4 +53,12 @@ func GetCollection(collectionName string) *mongo.Collection {
 		log.Fatal("MONGO_DB_NAME not set in .env file")
 	}
 	return DB.Database(dbName).Collection(collectionName)
+}
+
+func GetDB() *mongo.Database {
+	dbName := os.Getenv("MONGO_DB_NAME")
+	if dbName == "" {
+		log.Fatal("MONGO_DB_NAME not set in .env file")
+	}
+	return DB.Database(dbName)
 }
