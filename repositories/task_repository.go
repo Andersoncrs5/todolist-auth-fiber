@@ -18,7 +18,7 @@ type TaskRepository interface {
 	GetById(ctx context.Context, id primitive.ObjectID) (*models.Todo, int, error)
 	Create(ctx context.Context, userID primitive.ObjectID, task models.Todo) (*models.Todo, int, error)
 	Delete(ctx context.Context, id primitive.ObjectID) (int, error)
-	ChangeStatus(ctx context.Context, id primitive.ObjectID, task models.Todo) (*models.Todo, int, error)
+	ChangeStatus(ctx context.Context, id primitive.ObjectID, task *models.Todo) (*models.Todo, int, error)
 	Update(ctx context.Context, id primitive.ObjectID, dto taskdto.UpdateTaskDTO) (*models.Todo, int, error)
 	GetAll(ctx context.Context,userID primitive.ObjectID,title string,done *bool,createdAtBefore, createdAtAfter time.Time,page, pageSize int) ([]models.Todo, int64, error)
 	DeleteAllByUserId(ctx context.Context, userId primitive.ObjectID) (int64, error)
@@ -28,8 +28,8 @@ type taskRepository struct {
 	collection *mongo.Collection
 }
 
-func NewTaskRepository(db *mongo.Database) UserRepository {
-	return &userRepository{
+func NewTaskRepository(db *mongo.Database) TaskRepository {
+	return &taskRepository{
 		collection: db.Collection("tasks"),
 	}
 }
@@ -81,7 +81,7 @@ func (r *taskRepository) Delete(ctx context.Context, id primitive.ObjectID) (int
 	return 200, nil
 }
 
-func (r *taskRepository) ChangeStatus(ctx context.Context, id primitive.ObjectID, task models.Todo) (*models.Todo, int, error) {
+func (r *taskRepository) ChangeStatus(ctx context.Context, id primitive.ObjectID, task *models.Todo) (*models.Todo, int, error) {
 	base := bson.D{
 		{Key: "$set", Value: bson.D{
 			{Key: "done", Value: task.Done},
