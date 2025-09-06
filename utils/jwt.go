@@ -24,7 +24,8 @@ func GenerateJWT(user models.User) (string, error)  {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.ID.Hex(),
 		"email": user.Email,
-		"exp": time.Now().Add(time.Hour * 6).Unix(),
+		"username": user.Username,
+		"exp": time.Now().Add(time.Hour * 24).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(jwtSecret))
@@ -32,6 +33,31 @@ func GenerateJWT(user models.User) (string, error)  {
 		return "", fmt.Errorf("failed to sign token: %v", err)
 	}
 	return tokenString, nil
+}
+
+func GenerateRefreshToken(user models.User) (string, error) {
+	if err := godotenv.Load(); err != nil {
+		return "", fmt.Errorf("error loading .env file: %v", err)
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		return "", fmt.Errorf("JWT_SECRET not set in .env file")
+	}
+
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": user.ID.Hex(),
+		"email": user.Email,
+		"username": user.Username,
+		"exp": time.Now().Add(time.Hour * (24 * 7)).Unix(),
+	})
+
+	refreshTokenString, err := refreshToken.SignedString([]byte(jwtSecret))
+	if err != nil {
+		return "", fmt.Errorf("failed to sign token: %v", err)
+	}
+
+	return refreshTokenString, nil
 }
 
 func VerifyJWT(tokenString string) (primitive.ObjectID, error) {
