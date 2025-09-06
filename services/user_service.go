@@ -11,13 +11,13 @@ import (
 )
 
 type UserService interface {
-	GetById(ctx context.Context, id primitive.ObjectID) (*models.User, error)
-	GetByEmail(ctx context.Context, email string) (*models.User, error)
-	Delete(ctx context.Context, user *models.User) error
-	Save(ctx context.Context, dto userDto.CreateUserDTO) (*models.User, error)
-	ExistsByEmail(ctx context.Context, email string) (bool, error)
+	GetById(ctx context.Context, id primitive.ObjectID) (*models.User, int, error)
+	GetByEmail(ctx context.Context, email string) (*models.User, int, error)
+	Delete(ctx context.Context, user *models.User) (int, error)
+	Save(ctx context.Context, dto userDto.CreateUserDTO) (*models.User, int, error)
+	ExistsByEmail(ctx context.Context, email string) (bool, int, error)
 	Update(ctx context.Context, user *models.User, dto userDto.UpdateUserDTO) (*models.User, uint, error)
-	ExistsByUserName(ctx context.Context, UserName string) (bool, error)
+	ExistsByUserName(ctx context.Context, UserName string) (bool, int, error)
 	SetRefreshToken(ctx context.Context, user *models.User, refreshToken string) (*models.User, int, error)
 }
 
@@ -31,80 +31,80 @@ func NewUserService(repo repository.UserRepository) UserService {
 	}
 }
 
-func (u *userService) GetById(ctx context.Context, id primitive.ObjectID) (*models.User, error) {
-	user, err := u.repo.GetId(ctx, id)
+func (u *userService) GetById(ctx context.Context, id primitive.ObjectID) (*models.User, int, error) {
+	user, code, err := u.repo.GetId(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, code, err
 	}
 
 	if user == nil {
-		return nil, fmt.Errorf("User not found")
+		return nil, code, fmt.Errorf("User not found")
 	}
 
-	return user, nil
+	return user, code, nil
 }
 
-func (u *userService) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	user, err := u.repo.GetEmail(ctx, email)
+func (u *userService) GetByEmail(ctx context.Context, email string) (*models.User, int, error) {
+	user, code, err := u.repo.GetEmail(ctx, email)
 	if err != nil {
-		return nil, err
+		return nil, code, err
 	}
 
 	if user == nil {
-		return nil, fmt.Errorf("User not found")
+		return nil, 404, fmt.Errorf("User not found")
 	}
 
-	return user, nil
+	return user, 200, nil
 }
 
-func (u *userService) Delete(ctx context.Context, user *models.User) error { 
-	err := u.repo.Delete(ctx, user.ID)
+func (u *userService) Delete(ctx context.Context, user *models.User) (int, error) { 
+	code, err := u.repo.Delete(ctx, user.ID)
 	if err != nil {
-		return err
+		return code, err
 	}
 
-	return err
+	return code, nil
 }
 
-func (u *userService) Save(ctx context.Context, dto userDto.CreateUserDTO) (*models.User, error) {
+func (u *userService) Save(ctx context.Context, dto userDto.CreateUserDTO) (*models.User, int, error) {
 	var user models.User
 
 	user.Username = dto.Username
 	user.Email = dto.Email
 	user.Password = dto.Password
 
-	saved, err := u.repo.Save(ctx, &user)
+	saved, code, err := u.repo.Save(ctx, &user)
 	if err != nil {
-		return nil, err
+		return nil, code, err
 	}
 
-	return saved, nil
+	return saved, code, nil
 } 
 
-func (u *userService) ExistsByEmail(ctx context.Context, email string) (bool, error) {
+func (u *userService) ExistsByEmail(ctx context.Context, email string) (bool, int, error) {
 	if email == "" {
-		return false, fmt.Errorf("Email is required")
+		return false, 400, fmt.Errorf("Email is required")
 	}
 
-	check, err := u.repo.ExistsByEmail(ctx, email)
+	check, code, err := u.repo.ExistsByEmail(ctx, email)
 	if err != nil {
-		return false, err
+		return false, code, err
 	}
 
-	return check, nil
+	return check, code, nil
 }
 
-func (u *userService) ExistsByUserName(ctx context.Context, UserName string) (bool, error) {
+func (u *userService) ExistsByUserName(ctx context.Context, UserName string) (bool, int, error) {
 	if UserName == "" {
-		return false, fmt.Errorf("UserName is required")
+		return false, 400, fmt.Errorf("UserName is required")
 	}
 
-	check, err := u.repo.ExistsByUserName(ctx, UserName)
+	check, code, err := u.repo.ExistsByUserName(ctx, UserName)
 	if err != nil {
-		return false, err
+		return false, code, err
 	}
 
-	return check, nil
+	return check, code, nil
 }
 
 func (u *userService) Update(ctx context.Context, user *models.User, dto userDto.UpdateUserDTO) (*models.User, uint, error) {
