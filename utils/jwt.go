@@ -11,87 +11,73 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func GenerateJWT(user models.User) (string, error)  {
+var jwtSecret string
+
+const (
+	AccessTokenExpiration  = time.Hour * 24
+	RefreshTokenExpiration = time.Hour * 24 * 7
+)
+
+func init() {
 	if err := godotenv.Load(); err != nil {
-		return "", fmt.Errorf("error loading .env file: %v", err)
+		panic(fmt.Errorf("error loading .env file: %v", err))
 	}
 
-	jwtSecret := os.Getenv("JWT_SECRET")
+	jwtSecret = os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		return "", fmt.Errorf("JWT_SECRET not set in .env file")
+		panic("JWT_SECRET not set in .env file")
 	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": user.ID.Hex(),
-		"email": user.Email,
-		"username": user.Username,
-		"exp": time.Now().Add(time.Hour * 24).Unix(),
-	})
-
-	tokenString, err := token.SignedString([]byte(jwtSecret))
-	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %v", err)
-	}
-	return tokenString, nil
 }
 
-func GenerateRefreshToken(user models.User) (string, error) {
-	if err := godotenv.Load(); err != nil {
-		return "", fmt.Errorf("error loading .env file: %v", err)
-	}
-
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		return "", fmt.Errorf("JWT_SECRET not set in .env file")
-	}
-
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": user.ID.Hex(),
-		"email": user.Email,
+func GenerateToken(user *models.User, expiration time.Duration) (string, error) {
+	claims := jwt.MapClaims{
+		"user_id":  user.ID.Hex(),
+		"email":    user.Email,
 		"username": user.Username,
-		"exp": time.Now().Add(time.Hour * (24 * 7)).Unix(),
-	})
-
-	refreshTokenString, err := refreshToken.SignedString([]byte(jwtSecret))
-	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %v", err)
+		"exp":      time.Now().Add(expiration).Unix(),
 	}
 
-	return refreshTokenString, nil
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(jwtSecret))
 }
 
-func VerifyJWT(tokenString string) (primitive.ObjectID, error) {
-	if err := godotenv.Load(); err != nil {
-		return primitive.NilObjectID, fmt.Errorf("error loading .env file: %v", err)
-	}
-	
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		return primitive.NilObjectID, fmt.Errorf("JWT_SECRET not set in .env file")
-	}
+func GenerateAccessToken(user *models.User) (string, error) {
+	return GenerateToken(user, AccessTokenExpiration)
+}
 
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+func GenerateRefreshToken(user *models.User) (string, error) {
+	return GenerateToken(user, RefreshTokenExpiration)
+}
+
+func parseToken(tokenString string) (*jwt.Token, error) {
+	return jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(jwtSecret), nil
 	})
+}
 
+func ExtractUserID(tokenString string) (primitive.ObjectID, error) {
+	token, err := parseToken(tokenString)
 	if err != nil {
 		return primitive.NilObjectID, fmt.Errorf("failed to parse token: %v", err)
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		userIDHex, ok := claims["user_id"].(string)
-		if !ok {
-			return primitive.NilObjectID, fmt.Errorf("user_id not found in token claims")
-		}
-		userID, err := primitive.ObjectIDFromHex(userIDHex)
-		if err != nil {
-			return primitive.NilObjectID, fmt.Errorf("invalid user_id in token claims: %v", err)
-		}
-		return userID, nil
-	} else {
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
 		return primitive.NilObjectID, fmt.Errorf("invalid token")
 	}
+
+	userIDHex, ok := claims["user_id"].(string)
+	if !ok {
+		return primitive.NilObjectID, fmt.Errorf("user_id not found in token claims")
+	}
+
+	userID, err := primitive.ObjectIDFromHex(userIDHex)
+	if err != nil {
+		return primitive.NilObjectID, fmt.Errorf("invalid user_id in token claims: %v", err)
+	}
+
+	return userID, nil
 }
