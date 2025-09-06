@@ -15,7 +15,7 @@ type TaskService interface {
 	GetById(ctx context.Context, id primitive.ObjectID) (*models.Todo, int, error)
 	Delete(ctx context.Context, id primitive.ObjectID) (int, error)
 	Create(ctx context.Context, userID primitive.ObjectID, dto taskdto.CreateTaskDTO) (*models.Todo, int, error)
-	ChangeStatus(ctx context.Context, id primitive.ObjectID, task models.Todo) (*models.Todo, int, error)
+	ChangeStatus(ctx context.Context, id primitive.ObjectID, task *models.Todo) (*models.Todo, int, error)
 	Update(ctx context.Context, id primitive.ObjectID, dto taskdto.UpdateTaskDTO) (*models.Todo, int, error)
 	DeleteAllByUserId(ctx context.Context, userId primitive.ObjectID) (int64, error)
 	GetAll(
@@ -74,7 +74,7 @@ func (s *taskService) Create(ctx context.Context, userID primitive.ObjectID, dto
 	return saved, code, err
 }
 
-func (s *taskService) ChangeStatus(ctx context.Context, id primitive.ObjectID, task models.Todo) (*models.Todo, int, error) {
+func (s *taskService) ChangeStatus(ctx context.Context, id primitive.ObjectID, task *models.Todo) (*models.Todo, int, error) {
 	taskChanged, code, err := s.repo.ChangeStatus(ctx, id, task)
 	if err != nil {
 		return nil, code, err
@@ -110,10 +110,10 @@ func (s *taskService) GetAll(
 }
 
 func (s *taskService) DeleteAllByUserId(ctx context.Context, userId primitive.ObjectID) (int64, error) {
-	result, err := s.repo.DeleteAllByUserId(ctx, userId);
+	result, err := s.repo.DeleteAllByUserId(ctx, userId)
 	if err != nil {
 		return 0, err
 	}
 
-	return result, nil	
+	return result, nil
 }
