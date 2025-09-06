@@ -24,10 +24,14 @@ type UserHandler interface {
 
 type userHandler struct {
 	service services.UserService
+	taskService services.TaskService
 }
 
-func NewUserHandler(service services.UserService) UserHandler {
-	return &userHandler{service: service}
+func NewUserHandler(service services.UserService, taskService services.TaskService) UserHandler {
+	return &userHandler{
+		service: service,
+		taskService: taskService,
+	}
 }
 
 func (h *userHandler) Create(c *fiber.Ctx) error {
@@ -401,6 +405,18 @@ func (h *userHandler) Delete(c *fiber.Ctx) error {
 				Code:      code,
 				Status:    false,
 				Message:   "Error the delete the user",
+			},
+		)
+	}
+
+	if _, err := h.taskService.DeleteAllByUserId(c.Context(), userID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      err.Error(),
+				Code:      fiber.StatusInternalServerError,
+				Status:    false,
+				Message:   "Error the delete all task of user",
 			},
 		)
 	}
