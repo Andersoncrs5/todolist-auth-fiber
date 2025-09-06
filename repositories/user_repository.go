@@ -19,9 +19,10 @@ type UserRepository interface {
 	GetId(ctx context.Context, id primitive.ObjectID) (*models.User, error)
 	Save(ctx context.Context, user *models.User) (*models.User, error)
 	Delete(ctx context.Context, id primitive.ObjectID) error
-	Update(ctx context.Context, id primitive.ObjectID, update userDto.UpdateUserDTO) (*models.User, error)
+	Update(ctx context.Context, id primitive.ObjectID, update userDto.UpdateUserDTO) (*models.User, uint, error)
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
 	ExistsByUserName(ctx context.Context, username string) (bool, error)
+	SetRefreshToken(ctx context.Context, id primitive.ObjectID, refreshToken string) (*models.User, int, error)
 }
 
 type userRepository struct {
@@ -95,7 +96,7 @@ func (u *userRepository) Delete(ctx context.Context, id primitive.ObjectID) erro
 	return nil
 }
 
-func (u *userRepository) Update(ctx context.Context, id primitive.ObjectID, update userDto.UpdateUserDTO) (*models.User, error) {
+func (u *userRepository) Update(ctx context.Context, id primitive.ObjectID, update userDto.UpdateUserDTO) (*models.User, uint, error) {
 	base := bson.D{
 		{Key : "$set", Value: bson.D{
 			{Key: "username", Value: update.Username},
@@ -110,12 +111,12 @@ func (u *userRepository) Update(ctx context.Context, id primitive.ObjectID, upda
 	err := u.collection.FindOneAndUpdate(ctx, bson.M{"_id": id}, base, opts).Decode(&updatedUser)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, fmt.Errorf("User not found")
+			return nil, 404, fmt.Errorf("User not found")
 		}
-		return nil, fmt.Errorf("fail to update user: %w", err)
+		return nil, 500, fmt.Errorf("fail to update user: %w", err)
 	}
 
-	return &updatedUser, nil
+	return &updatedUser, 200, nil
 }
 
 func (u *userRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
@@ -154,4 +155,25 @@ func (u *userRepository) ExistsByUserName(ctx context.Context, username string) 
     }
 
 	return true, nil
+}
+
+func (u *userRepository) SetRefreshToken(ctx context.Context, id primitive.ObjectID, refreshToken string) (*models.User, int, error) {
+	base := bson.D{
+		{Key: "$set", Value: bson.D{
+			{Key: "refresh_token", Value: refreshToken},
+			{Key: "updated_at", Value: time.Now()},
+		}},
+	}
+
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var userUpdated models.User
+	err := u.collection.FindOneAndUpdate(ctx, bson.M{"_id": id}, base, opts).Decode(&userUpdated)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, 404, fmt.Errorf("User not found")
+		}
+		return nil, 500,fmt.Errorf("fail to update user: %w", err)
+	}
+
+	return &userUpdated, 200, nil
 }
