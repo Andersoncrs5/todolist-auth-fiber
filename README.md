@@ -15,3 +15,5 @@ It is a secure and scalable To-Do List API that implements authentication and fo
  JWT (JSON Web Token) authentication for secure user sessions.
 
  Crypto-based password hashing for strong user credential protection.
+
+ RateLimiting
