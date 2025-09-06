@@ -1,17 +1,25 @@
 package handlers
 
 import (
+	"strings"
 	"time"
-	"todolist-auth-fiber/dtos/userDto"
+	dto "todolist-auth-fiber/dtos/userDto"
 	"todolist-auth-fiber/services"
 	"todolist-auth-fiber/utils"
 	"todolist-auth-fiber/utils/crypto"
+	mappers "todolist-auth-fiber/utils/mappers/user"
 	"todolist-auth-fiber/utils/res"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 type UserHandler interface {
+	Create(c *fiber.Ctx) error
+	Login(c *fiber.Ctx) error
+	Me(c *fiber.Ctx) error
+	Delete(c *fiber.Ctx) error
+	Update(c *fiber.Ctx) error
+	Revoke(c *fiber.Ctx) error
 }
 
 type userHandler struct {
@@ -23,7 +31,7 @@ func NewUserHandler(service services.UserService) UserHandler {
 }
 
 func (h *userHandler) Create(c *fiber.Ctx) error {
-	var req userDto.CreateUserDTO
+	var req dto.CreateUserDTO
 
 	if err := c.BodyParser(&req); err != nil {
 		response := res.ResponseHttp[string]{
@@ -141,6 +149,19 @@ func (h *userHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(res)
 	}
 
+	_, code, err := h.service.SetRefreshToken(c.Context(), saved, refreshToken)
+	if err != nil && code == 500 {
+		res := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      code,
+			Status:    true,
+			Message:   "Error internal in server! Please try again later",
+		}
+
+		return c.Status(code).JSON(res)
+	}
+
 	tokens := res.ResponseToken{
 		Token:        token,
 		RefreshToken: refreshToken,
@@ -158,7 +179,7 @@ func (h *userHandler) Create(c *fiber.Ctx) error {
 }
 
 func (h *userHandler) Login(c *fiber.Ctx) error {
-	var req userDto.LoginUserDTO
+	var req dto.LoginUserDTO
 
 	if err := c.BodyParser(&req); err != nil {
 		response := res.ResponseHttp[string]{
@@ -229,13 +250,366 @@ func (h *userHandler) Login(c *fiber.Ctx) error {
 		RefreshToken: refreshToken,
 	}
 
-	res := res.ResponseHttp[res.ResponseToken]{
-		Timestamp: time.Now(),
-		Body:      tokens,
-		Code:      fiber.StatusCreated,
-		Status:    true,
-		Message:   "Welcome again",
+	_, code, err := h.service.SetRefreshToken(c.Context(), user, refreshToken)
+	if err != nil && code == 500 {
+		res := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      code,
+			Status:    true,
+			Message:   "Error internal in server! Please try again later",
+		}
+
+		return c.Status(code).JSON(res)
 	}
 
-	return c.Status(fiber.StatusOK).JSON(res)
+	return c.Status(fiber.StatusOK).JSON(
+		res.ResponseHttp[res.ResponseToken]{
+			Timestamp: time.Now(),
+			Body:      tokens,
+			Code:      fiber.StatusCreated,
+			Status:    true,
+			Message:   "Welcome again",
+		},
+	)
+}
+
+func (h *userHandler) Me(c *fiber.Ctx) error {
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      "",
+			Code:      fiber.StatusUnauthorized,
+			Status:    false,
+			Message:   "",
+		}
+
+		return c.Status(fiber.StatusUnauthorized).JSON(response)
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	if tokenString == authHeader {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      "",
+			Code:      fiber.StatusUnauthorized,
+			Status:    false,
+			Message:   "Invalid Authorization header format",
+		}
+
+		return c.Status(fiber.StatusUnauthorized).JSON(response)
+	}
+
+	userID, err := utils.ExtractUserID(tokenString)
+	if err != nil {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      fiber.StatusUnauthorized,
+			Status:    false,
+			Message:   "You are not Authorization",
+		}
+
+		return c.Status(fiber.StatusUnauthorized).JSON(response)
+	}
+
+	user, err := h.service.GetById(c.Context(), userID)
+	if err != nil {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      fiber.StatusUnauthorized,
+			Status:    false,
+			Message:   "You are not Authorization",
+		}
+
+		return c.Status(fiber.StatusUnauthorized).JSON(response)
+	}
+
+	userDto := mappers.UserToUserDTO(user)
+
+	response := res.ResponseHttp[dto.UserDTO]{
+		Timestamp: time.Now(),
+		Body:      userDto,
+		Code:      fiber.StatusOK,
+		Status:    true,
+		Message:   "Me",
+	}
+
+	return c.Status(fiber.StatusOK).JSON(response)
+}
+
+func (h *userHandler) Delete(c *fiber.Ctx) error {
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      "",
+			Code:      fiber.StatusUnauthorized,
+			Status:    false,
+			Message:   "You are not authorized",
+		}
+
+		return c.Status(fiber.StatusUnauthorized).JSON(response)
+	}
+
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	if token == authHeader {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      "",
+			Code:      fiber.StatusUnauthorized,
+			Status:    false,
+			Message:   "Invalid Authorization header format",
+		}
+
+		return c.Status(fiber.StatusUnauthorized).JSON(response)
+	}
+
+	userID, err := utils.ExtractUserID(token)
+	if err != nil {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      fiber.StatusUnauthorized,
+			Status:    false,
+			Message:   "You are not Authorization",
+		}
+
+		return c.Status(fiber.StatusUnauthorized).JSON(response)
+	}
+
+	user, err := h.service.GetById(c.Context(), userID)
+	if err != nil {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      fiber.StatusUnauthorized,
+			Status:    false,
+			Message:   "You are not Authorization",
+		}
+
+		return c.Status(fiber.StatusUnauthorized).JSON(response)
+	}
+
+	if err := h.service.Delete(c.Context(), user); err != nil {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      fiber.StatusInternalServerError,
+			Status:    false,
+			Message:   "Error the delete the user",
+		}
+
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	response := res.ResponseHttp[string]{
+		Timestamp: time.Now(),
+		Body:      "",
+		Code:      fiber.StatusOK,
+		Status:    false,
+		Message:   "Bye Bye",
+	}
+
+	return c.Status(fiber.StatusOK).JSON(response)
+}
+
+func (h *userHandler) Update(c *fiber.Ctx) error {
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      "",
+				Code:      fiber.StatusUnauthorized,
+				Status:    false,
+				Message:   "",
+			},
+		)
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	if tokenString == authHeader {
+		return c.Status(fiber.StatusUnauthorized).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      "",
+				Code:      fiber.StatusUnauthorized,
+				Status:    false,
+				Message:   "Invalid Authorization header format",
+			},
+		)
+
+	}
+
+	userID, err := utils.ExtractUserID(tokenString)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      err.Error(),
+				Code:      fiber.StatusUnauthorized,
+				Status:    false,
+				Message:   "You are not Authorization",
+			},
+		)
+	}
+
+	var req dto.UpdateUserDTO
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      err.Error(),
+				Code:      fiber.StatusBadRequest,
+				Status:    false,
+				Message:   "Inputs invalds",
+			},
+		)
+	}
+
+	user, err := h.service.GetById(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      err.Error(),
+				Code:      fiber.StatusUnauthorized,
+				Status:    false,
+				Message:   "You are not Authorization",
+			},
+		)
+	}
+
+	if req.Username != user.Username {
+		checkUserName, err := h.service.ExistsByUserName(c.Context(), req.Username)
+		if err != nil {
+			res := res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      err.Error(),
+				Code:      fiber.StatusInternalServerError,
+				Status:    false,
+				Message:   "Error the check if username exists!",
+			}
+
+			return c.Status(fiber.StatusInternalServerError).JSON(res)
+		}
+
+		if checkUserName == true {
+			res := res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      "",
+				Code:      fiber.StatusConflict,
+				Status:    false,
+				Message:   "Username already exists",
+			}
+
+			return c.Status(fiber.StatusConflict).JSON(res)
+		}
+	}
+
+	userUpdated, code, err := h.service.Update(c.Context(), user, req)
+	if err != nil {
+		return c.Status(int(code)).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      err.Error(),
+				Code:      int(code),
+				Status:    false,
+				Message:   "Error the update user",
+			},
+		)
+	}
+
+	userDto := mappers.UserToUserDTO(userUpdated)
+
+	return c.Status(fiber.StatusOK).JSON(
+		res.ResponseHttp[dto.UserDTO]{
+			Timestamp: time.Now(),
+			Body:      userDto,
+			Code:      fiber.StatusOK,
+			Status:    true,
+			Message:   "User updated with successfully",
+		},
+	)
+}
+
+func (h *userHandler) Revoke(c *fiber.Ctx) error {
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      "",
+				Code:      fiber.StatusUnauthorized,
+				Status:    false,
+				Message:   "",
+			},
+		)
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	if tokenString == authHeader {
+		return c.Status(fiber.StatusUnauthorized).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      "",
+				Code:      fiber.StatusUnauthorized,
+				Status:    false,
+				Message:   "Invalid Authorization header format",
+			},
+		)
+
+	}
+
+	userID, err := utils.ExtractUserID(tokenString)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      err.Error(),
+				Code:      fiber.StatusUnauthorized,
+				Status:    false,
+				Message:   "You are not Authorization",
+			},
+		)
+	}
+
+	user, err := h.service.GetById(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      err.Error(),
+				Code:      fiber.StatusUnauthorized,
+				Status:    false,
+				Message:   "You are not Authorization",
+			},
+		)
+	}
+
+	_, code, err := h.service.SetRefreshToken(c.Context(), user, "")
+	if err != nil {
+		return c.Status(code).JSON(
+			res.ResponseHttp[string]{
+				Timestamp: time.Now(),
+				Body:      err.Error(),
+				Code:      code,
+				Status:    true,
+				Message:   "Error internal in server! Please try again later",
+			},
+		)
+	}
+
+	return c.Status(fiber.StatusOK).JSON(
+		res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      "",
+			Code:      fiber.StatusOK,
+			Status:    true,
+			Message:   "See you later",
+		},
+	)
 }
