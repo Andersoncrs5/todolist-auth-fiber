@@ -42,7 +42,7 @@ func (u *userRepository) GetEmail(ctx context.Context, email string) (*models.Us
 	err := u.collection.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, 0, nil
+			return nil, 404, nil
 		}
 		return nil, 500, fmt.Errorf("Fail the to search user by email")
 	}

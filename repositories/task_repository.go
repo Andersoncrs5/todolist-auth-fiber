@@ -40,7 +40,7 @@ func (r *taskRepository) GetById(ctx context.Context, id primitive.ObjectID) (*m
 
 	err := r.collection.FindOne(ctx, filter).Decode(&task)
 	if err != nil && errors.Is(err, mongo.ErrNoDocuments) {
-		return nil, 404, fmt.Errorf("Task not found")
+		return nil, 404, nil
 	}
 
 	if err != nil {
