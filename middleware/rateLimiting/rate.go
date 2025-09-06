@@ -92,3 +92,23 @@ func UpdateRate() fiber.Handler {
 	})
 }
 
+func CustomRate(max int, expiration time.Duration) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:        max,
+		Expiration: expiration,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return c.IP() 
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(
+				res.ResponseHttp[string]{
+					Timestamp: time.Now(),
+					Body: "",
+					Code: fiber.StatusTooManyRequests,
+					Status: false,
+					Message: "Too many requests, please try again later.",
+				},
+			)
+		},
+	})
+}
