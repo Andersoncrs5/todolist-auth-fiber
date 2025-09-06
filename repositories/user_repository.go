@@ -21,6 +21,7 @@ type UserRepository interface {
 	Delete(ctx context.Context, id primitive.ObjectID) error
 	Update(ctx context.Context, id primitive.ObjectID, update userDto.UpdateUserDTO) (*models.User, error)
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
+	ExistsByUserName(ctx context.Context, username string) (bool, error)
 }
 
 type userRepository struct {
@@ -136,3 +137,21 @@ func (u *userRepository) ExistsByEmail(ctx context.Context, email string) (bool,
     return true, nil
 }
 
+func (u *userRepository) ExistsByUserName(ctx context.Context, username string) (bool, error) { 
+	filter := bson.M{"username": username}
+	opts := options.FindOne().SetProjection(bson.M{"_id": 1})
+
+	var result struct {
+        ID primitive.ObjectID `bson:"_id"`
+    }
+
+	err := u.collection.FindOne(ctx, filter, opts).Decode(&result)
+	if err != nil {
+        if errors.Is(err, mongo.ErrNoDocuments) {
+            return false, nil
+        }
+        return false, fmt.Errorf("fail to check if user exists by username: %w", err)
+    }
+
+	return true, nil
+}
