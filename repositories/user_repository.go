@@ -29,7 +29,7 @@ type userRepository struct {
 	collection *mongo.Collection
 }
 
-func NewUserRepository(db *mongo.Database) UserRepository { 
+func NewUserRepository(db *mongo.Database) UserRepository {
 	return &userRepository{
 		collection: db.Collection("users"),
 	}
@@ -39,12 +39,12 @@ func (u *userRepository) GetEmail(ctx context.Context, email string) (*models.Us
 	var user models.User
 	filter := bson.M{"email": email}
 
-	err := u.collection.FindOne(ctx, filter).Decode(&user);
-	if err != nil  {
+	err := u.collection.FindOne(ctx, filter).Decode(&user)
+	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil , 0,nil;
+			return nil, 0, nil
 		}
-		return nil, 500, fmt.Errorf("Fail the to search user by email");
+		return nil, 500, fmt.Errorf("Fail the to search user by email")
 	}
 
 	return &user, 200, nil
@@ -54,13 +54,13 @@ func (u *userRepository) GetId(ctx context.Context, id primitive.ObjectID) (*mod
 	var user models.User
 	filter := bson.M{"_id": id}
 
-	err := u.collection.FindOne(ctx, filter).Decode(&user);
-	if err != nil  {
+	err := u.collection.FindOne(ctx, filter).Decode(&user)
+	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil , 404, nil;
+			return nil, 404, nil
 		}
 
-		return nil, 500, fmt.Errorf("Fail the to search user by id");
+		return nil, 500, fmt.Errorf("Fail the to search user by id")
 	}
 
 	return &user, 200, nil
@@ -70,8 +70,8 @@ func (u *userRepository) Save(ctx context.Context, user *models.User) (*models.U
 	user.ID = primitive.NewObjectID()
 	now := time.Now()
 
-    user.CreatedAt = &now
-    user.UpdatedAt = &now
+	user.CreatedAt = &now
+	user.UpdatedAt = &now
 
 	_, err := u.collection.InsertOne(ctx, user)
 	if err != nil {
@@ -82,7 +82,7 @@ func (u *userRepository) Save(ctx context.Context, user *models.User) (*models.U
 }
 
 func (u *userRepository) Delete(ctx context.Context, id primitive.ObjectID) (int, error) {
-	filter := bson.M{ "_id": id }
+	filter := bson.M{"_id": id}
 	result, err := u.collection.DeleteOne(ctx, filter)
 
 	if err != nil {
@@ -98,13 +98,13 @@ func (u *userRepository) Delete(ctx context.Context, id primitive.ObjectID) (int
 
 func (u *userRepository) Update(ctx context.Context, id primitive.ObjectID, update userDto.UpdateUserDTO) (*models.User, uint, error) {
 	base := bson.D{
-		{Key : "$set", Value: bson.D{
+		{Key: "$set", Value: bson.D{
 			{Key: "username", Value: update.Username},
 			{Key: "password", Value: update.Password},
 			{Key: "updated_at", Value: time.Now()},
 		}},
 	}
-	
+
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 
 	var updatedUser models.User
@@ -120,39 +120,39 @@ func (u *userRepository) Update(ctx context.Context, id primitive.ObjectID, upda
 }
 
 func (u *userRepository) ExistsByEmail(ctx context.Context, email string) (bool, int, error) {
-    filter := bson.M{"email": email}
-    opts := options.FindOne().SetProjection(bson.M{"_id": 1})
+	filter := bson.M{"email": email}
+	opts := options.FindOne().SetProjection(bson.M{"_id": 1})
 
-    var result struct {
-        ID primitive.ObjectID `bson:"_id"`
-    }
+	var result struct {
+		ID primitive.ObjectID `bson:"_id"`
+	}
 
-    err := u.collection.FindOne(ctx, filter, opts).Decode(&result)
-    if err != nil {
-        if errors.Is(err, mongo.ErrNoDocuments) {
-            return false, 404, nil
-        }
-        return false, 500, fmt.Errorf("fail to check if user exists by email: %w", err)
-    }
+	err := u.collection.FindOne(ctx, filter, opts).Decode(&result)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return false, 404, nil
+		}
+		return false, 500, fmt.Errorf("fail to check if user exists by email: %w", err)
+	}
 
-    return true, 200, nil
+	return true, 200, nil
 }
 
-func (u *userRepository) ExistsByUserName(ctx context.Context, username string) (bool, int, error) { 
+func (u *userRepository) ExistsByUserName(ctx context.Context, username string) (bool, int, error) {
 	filter := bson.M{"username": username}
 	opts := options.FindOne().SetProjection(bson.M{"_id": 1})
 
 	var result struct {
-        ID primitive.ObjectID `bson:"_id"`
-    }
+		ID primitive.ObjectID `bson:"_id"`
+	}
 
 	err := u.collection.FindOne(ctx, filter, opts).Decode(&result)
 	if err != nil {
-        if errors.Is(err, mongo.ErrNoDocuments) {
-            return false, 404, nil
-        }
-        return false, 500, fmt.Errorf("fail to check if user exists by username: %w", err)
-    }
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return false, 404, nil
+		}
+		return false, 500, fmt.Errorf("fail to check if user exists by username: %w", err)
+	}
 
 	return true, 200, nil
 }
@@ -172,7 +172,7 @@ func (u *userRepository) SetRefreshToken(ctx context.Context, id primitive.Objec
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, 404, fmt.Errorf("User not found")
 		}
-		return nil, 500,fmt.Errorf("fail to update user: %w", err)
+		return nil, 500, fmt.Errorf("fail to update user: %w", err)
 	}
 
 	return &userUpdated, 200, nil
