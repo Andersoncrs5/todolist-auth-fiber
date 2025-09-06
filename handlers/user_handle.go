@@ -156,3 +156,86 @@ func (h *userHandler) Create(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusCreated).JSON(res)
 }
+
+func (h *userHandler) Login(c *fiber.Ctx) error {
+	var req userDto.LoginUserDTO
+
+	if err := c.BodyParser(&req); err != nil {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      fiber.StatusBadRequest,
+			Status:    false,
+			Message:   "Inputs invalid",
+		}
+
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	user, err := h.service.GetByEmail(c.Context(), req.Email)
+	if err != nil {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      fiber.StatusUnauthorized,
+			Status:    false,
+			Message:   "Login invalid",
+		}
+
+		return c.Status(fiber.StatusUnauthorized).JSON(response)
+	}
+
+	check := crypto.Compare(req.Password, user.Password)
+	if check == false {
+		response := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      "",
+			Code:      fiber.StatusUnauthorized,
+			Status:    false,
+			Message:   "Login invalid",
+		}
+
+		return c.Status(fiber.StatusUnauthorized).JSON(response)
+	}
+
+	token, err := utils.GenerateAccessToken(user)
+	if err != nil {
+		res := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      fiber.StatusInternalServerError,
+			Status:    false,
+			Message:   "Error in server! Please try again later",
+		}
+
+		return c.Status(fiber.StatusInternalServerError).JSON(res)
+	}
+
+	refreshToken, err := utils.GenerateRefreshToken(user)
+	if err != nil {
+		res := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      fiber.StatusInternalServerError,
+			Status:    false,
+			Message:   "Error in server! Please try again later",
+		}
+
+		return c.Status(fiber.StatusInternalServerError).JSON(res)
+	}
+
+	tokens := res.ResponseToken{
+		Token:        token,
+		RefreshToken: refreshToken,
+	}
+
+	res := res.ResponseHttp[res.ResponseToken]{
+		Timestamp: time.Now(),
+		Body:      tokens,
+		Code:      fiber.StatusCreated,
+		Status:    true,
+		Message:   "Welcome again",
+	}
+
+	return c.Status(fiber.StatusOK).JSON(res)
+}
