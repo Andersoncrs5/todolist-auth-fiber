@@ -21,6 +21,7 @@ type TaskRepository interface {
 	ChangeStatus(ctx context.Context, id primitive.ObjectID, task models.Todo) (*models.Todo, int, error)
 	Update(ctx context.Context, id primitive.ObjectID, dto taskdto.UpdateTaskDTO) (*models.Todo, int, error)
 	GetAll(ctx context.Context,userID primitive.ObjectID,title string,done *bool,createdAtBefore, createdAtAfter time.Time,page, pageSize int) ([]models.Todo, int64, error)
+	DeleteAllByUserId(ctx context.Context, userId primitive.ObjectID) (int64, error)
 }
 
 type taskRepository struct {
@@ -39,7 +40,7 @@ func (r *taskRepository) GetById(ctx context.Context, id primitive.ObjectID) (*m
 
 	err := r.collection.FindOne(ctx, filter).Decode(&task)
 	if err != nil && errors.Is(err, mongo.ErrNoDocuments) {
-		return nil, 404, nil
+		return nil, 404, fmt.Errorf("Task not found")
 	}
 
 	if err != nil {
@@ -93,7 +94,7 @@ func (r *taskRepository) ChangeStatus(ctx context.Context, id primitive.ObjectID
 	err := r.collection.FindOneAndUpdate(ctx, bson.M{"_id": id}, base, opts).Decode(&taskUpdated)
 
 	if err != nil && errors.Is(err, mongo.ErrNoDocuments) {
-		return nil, 404, nil
+		return nil, 404, fmt.Errorf("Task not found")
 	}
 
 	if err != nil {
@@ -118,7 +119,7 @@ func (r *taskRepository) Update(ctx context.Context, id primitive.ObjectID, dto 
 	err := r.collection.FindOneAndUpdate(ctx, bson.M{"_id": id}, base, opts).Decode(&taskUpdated)
 
 	if err != nil && errors.Is(err, mongo.ErrNoDocuments) {
-		return nil, 404, nil
+		return nil, 404, fmt.Errorf("Task not found")
 	}
 
 	if err != nil {
@@ -185,4 +186,13 @@ func (r *taskRepository) GetAll(
 	}
 
 	return tasks, total, nil
+}
+
+func (r *taskRepository) DeleteAllByUserId(ctx context.Context, userId primitive.ObjectID) (int64, error) {
+	filter := bson.M{"user_id": userId}
+	result, err := r.collection.DeleteMany(ctx, filter)
+	if err != nil {
+		return 0, err
+	}
+	return result.DeletedCount, nil
 }
