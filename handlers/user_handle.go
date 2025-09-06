@@ -115,7 +115,7 @@ func (h *userHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(res)
 	}
 
-	token, err := utils.GenerateToken(saved)
+	token, err := utils.GenerateAccessToken(saved)
 	if err != nil {
 		res := res.ResponseHttp[string]{
 			Timestamp: time.Now(),
