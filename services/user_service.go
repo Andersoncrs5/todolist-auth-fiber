@@ -5,13 +5,19 @@ import (
 	"fmt"
 	"todolist-auth-fiber/dtos/userDto"
 	"todolist-auth-fiber/models"
-	repository "todolist-auth-fiber/repositories"
+	"todolist-auth-fiber/repositories"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type UserService interface {
-	
+	GetById(ctx context.Context, id primitive.ObjectID) (*models.User, error)
+	GetByEmail(ctx context.Context, email string) (*models.User, error)
+	Delete(ctx context.Context, user models.User) error
+	Save(ctx context.Context, dto userDto.CreateUserDTO) (*models.User, error)
+	ExistsByEmail(ctx context.Context, email string) (bool, error)
+	Update(ctx context.Context, user models.User, dto userDto.UpdateUserDTO) (*models.User, error)
+	ExistsByUserName(ctx context.Context, UserName string) (bool, error)
 }
 
 type userService struct {
@@ -37,7 +43,7 @@ func (u *userService) GetById(ctx context.Context, id primitive.ObjectID) (*mode
 	return user, nil
 }
 
-func (u *userService) GetByEmail(ctx context.Context, email string) (*models.User, error)  {
+func (u *userService) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	user, err := u.repo.GetEmail(ctx, email)
 	if err != nil {
 		return nil, err
@@ -80,6 +86,19 @@ func (u *userService) ExistsByEmail(ctx context.Context, email string) (bool, er
 	}
 
 	check, err := u.repo.ExistsByEmail(ctx, email)
+	if err != nil {
+		return false, err
+	}
+
+	return check, nil
+}
+
+func (u *userService) ExistsByUserName(ctx context.Context, UserName string) (bool, error) {
+	if UserName == "" {
+		return false, fmt.Errorf("UserName is required")
+	}
+
+	check, err := u.repo.ExistsByUserName(ctx, UserName)
 	if err != nil {
 		return false, err
 	}
