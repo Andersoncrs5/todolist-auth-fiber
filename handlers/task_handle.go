@@ -11,9 +11,12 @@ import (
 	"todolist-auth-fiber/utils/pagination"
 	"todolist-auth-fiber/utils/res"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+var validater = validator.New()
 
 type TaskHandler interface {
 	GetById(c *fiber.Ctx) error
@@ -294,6 +297,23 @@ func (h *taskHandler) Create(c *fiber.Ctx) error {
 		)
 	}
 
+	if err := validater.Struct(req); err != nil {
+		errors := []string{}
+		for _, err := range err.(validator.ValidationErrors) {
+			errors = append(errors, err.Field()+" failed on "+err.Tag())
+		}
+
+		return c.Status(fiber.StatusBadRequest).JSON(
+			res.ResponseHttp[[]string]{
+				Timestamp: time.Now(),
+				Body:      errors,
+				Code:      fiber.StatusBadRequest,
+				Status:    false,
+				Message:   "Inputs invalids",
+			},
+		)
+	}
+
 	saved, code, err := h.service.Create(c.Context(), userID, req)
 	if err != nil {
 		return c.Status(code).JSON(
@@ -498,6 +518,23 @@ func (h *taskHandler) Update(c *fiber.Ctx) error {
 			res.ResponseHttp[string]{
 				Timestamp: time.Now(),
 				Body:      err.Error(),
+				Code:      fiber.StatusBadRequest,
+				Status:    false,
+				Message:   "Inputs invalids",
+			},
+		)
+	}
+
+	if err := validater.Struct(req); err != nil {
+		errors := []string{}
+		for _, err := range err.(validator.ValidationErrors) {
+			errors = append(errors, err.Field()+" failed on "+err.Tag())
+		}
+
+		return c.Status(fiber.StatusBadRequest).JSON(
+			res.ResponseHttp[[]string]{
+				Timestamp: time.Now(),
+				Body:      errors,
 				Code:      fiber.StatusBadRequest,
 				Status:    false,
 				Message:   "Inputs invalids",

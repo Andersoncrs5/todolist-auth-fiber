@@ -10,8 +10,11 @@ import (
 	mappers "todolist-auth-fiber/utils/mappers/user"
 	"todolist-auth-fiber/utils/res"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 )
+
+var validaterUser = validator.New()
 
 type UserHandler interface {
 	Create(c *fiber.Ctx) error
@@ -23,13 +26,13 @@ type UserHandler interface {
 }
 
 type userHandler struct {
-	service services.UserService
+	service     services.UserService
 	taskService services.TaskService
 }
 
 func NewUserHandler(service services.UserService, taskService services.TaskService) UserHandler {
 	return &userHandler{
-		service: service,
+		service:     service,
 		taskService: taskService,
 	}
 }
@@ -47,6 +50,23 @@ func (h *userHandler) Create(c *fiber.Ctx) error {
 		}
 
 		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	if err := validaterUser.Struct(req); err != nil {
+		errors := []string{}
+		for _, err := range err.(validator.ValidationErrors) {
+			errors = append(errors, err.Field()+" failed on "+err.Tag())
+		}
+
+		return c.Status(fiber.StatusBadRequest).JSON(
+			res.ResponseHttp[[]string]{
+				Timestamp: time.Now(),
+				Body:      errors,
+				Code:      fiber.StatusBadRequest,
+				Status:    false,
+				Message:   "Inputs invalids",
+			},
+		)
 	}
 
 	checkEmail, code, err := h.service.ExistsByEmail(c.Context(), req.Email)
@@ -195,6 +215,23 @@ func (h *userHandler) Login(c *fiber.Ctx) error {
 		}
 
 		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	if err := validaterUser.Struct(req); err != nil {
+		errors := []string{}
+		for _, err := range err.(validator.ValidationErrors) {
+			errors = append(errors, err.Field()+" failed on "+err.Tag())
+		}
+
+		return c.Status(fiber.StatusBadRequest).JSON(
+			res.ResponseHttp[[]string]{
+				Timestamp: time.Now(),
+				Body:      errors,
+				Code:      fiber.StatusBadRequest,
+				Status:    false,
+				Message:   "Inputs invalids",
+			},
+		)
 	}
 
 	user, code, err := h.service.GetByEmail(c.Context(), req.Email)
@@ -486,6 +523,23 @@ func (h *userHandler) Update(c *fiber.Ctx) error {
 		)
 	}
 
+	if err := validaterUser.Struct(req); err != nil {
+		errors := []string{}
+		for _, err := range err.(validator.ValidationErrors) {
+			errors = append(errors, err.Field()+" failed on "+err.Tag())
+		}
+
+		return c.Status(fiber.StatusBadRequest).JSON(
+			res.ResponseHttp[[]string]{
+				Timestamp: time.Now(),
+				Body:      errors,
+				Code:      fiber.StatusBadRequest,
+				Status:    false,
+				Message:   "Inputs invalids",
+			},
+		)
+	}
+
 	user, code, err := h.service.GetById(c.Context(), userID)
 	if err != nil {
 		return c.Status(code).JSON(
@@ -525,6 +579,21 @@ func (h *userHandler) Update(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusConflict).JSON(res)
 		}
 	}
+
+	newPasswordHash, err := crypto.Encoder(req.Password)
+	if err != nil {
+		res := res.ResponseHttp[string]{
+			Timestamp: time.Now(),
+			Body:      err.Error(),
+			Code:      fiber.StatusInternalServerError,
+			Status:    false,
+			Message:   "Error the encoder password!",
+		}
+
+		return c.Status(fiber.StatusInternalServerError).JSON(res)
+	}
+
+	req.Password = newPasswordHash
 
 	userUpdated, codeUpdate, err := h.service.Update(c.Context(), user, req)
 	if err != nil {
