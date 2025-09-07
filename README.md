@@ -17,3 +17,5 @@ It is a secure and scalable To-Do List API that implements authentication and fo
  Crypto-based password hashing for strong user credential protection.
 
  RateLimiting
+ 
+ Validation Input
