@@ -84,11 +84,11 @@ func (r *taskRepository) Delete(ctx context.Context, id primitive.ObjectID) (int
 func (r *taskRepository) ChangeStatus(ctx context.Context, id primitive.ObjectID, task *models.Todo) (*models.Todo, int, error) {
 	base := bson.D{
 		{Key: "$set", Value: bson.D{
-			{Key: "done", Value: task.Done},
+			{Key: "done", Value: !task.Done},
 		}},
 	}
 
-	opts := options.FindOneAndUpdate().SetProjection(options.After)
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 	var taskUpdated models.Todo
 
 	err := r.collection.FindOneAndUpdate(ctx, bson.M{"_id": id}, base, opts).Decode(&taskUpdated)
@@ -113,7 +113,7 @@ func (r *taskRepository) Update(ctx context.Context, id primitive.ObjectID, dto 
 		}},
 	}
 
-	opts := options.FindOneAndUpdate().SetProjection(options.After)
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 	var taskUpdated models.Todo
 
 	err := r.collection.FindOneAndUpdate(ctx, bson.M{"_id": id}, base, opts).Decode(&taskUpdated)
